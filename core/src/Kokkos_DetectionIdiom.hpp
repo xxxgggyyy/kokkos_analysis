@@ -56,6 +56,9 @@
 
 // I deliberately omitted detected_or which does not fit well with the rest
 // of the specification. In my opinion, it should be removed from the TS.
+//
+// 通用型的detetion idiom，detected_t可检测某个类型是否含有一个自定义类型
+// 若有则返回该自定义类型，无则返回一个nonesuch类型作为缺省值
 
 namespace Kokkos {
 

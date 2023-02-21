@@ -122,6 +122,7 @@ class Serial {
   //@{
 
   //! Tag this class as an execution space:
+  //! detected_t 配合 is_execution_space检测是否存在
   using execution_space = Serial;
   //! This device's preferred memory space.
   using memory_space = Kokkos::HostSpace;

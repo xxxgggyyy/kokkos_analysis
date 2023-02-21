@@ -87,6 +87,10 @@ struct KOKKOS_IMPL_ENFORCE_EMPTY_BASE_OPTIMIZATION
 //------------------------------------------------------------------------------
 // Note: unspecialized, so that the default pathway is to fall back to using
 // the PolicyTraitMatcher. See AnalyzeExecPolicyUseMatcher below
+// 就是继承的AnalyzeExcePolicyUseMatcher
+// 主模板，处理具有Traits非空的情况
+// execution_policy_trait_specifications为一个type_list<ExecutionSpaceTraits ...>类型，
+// 该类型包含了预定义的Traits类型
 template <class Enable, class... Traits>
 struct AnalyzeExecPolicy
     : AnalyzeExecPolicyUseMatcher<void, execution_policy_trait_specifications,
@@ -100,14 +104,22 @@ struct AnalyzeExecPolicy
 //------------------------------------------------------------------------------
 // Ignore void for backwards compatibility purposes, though hopefully no one is
 // using this in application code
+// 递归忽略Traits含有的void类型
 template <class... Traits>
 struct AnalyzeExecPolicy<void, void, Traits...>
     : AnalyzeExecPolicy<void, Traits...> {
   using base_t = AnalyzeExecPolicy<void, Traits...>;
+  // 继承基类各个构造函数
+  // 奇怪的语法 using [typename] Base::Base
+  // 继承其他成员函数 using [typename] Base::memFun
+  // using t::mem还有在当前作用域引入mem的作用
   using base_t::base_t;
 };
 
 //------------------------------------------------------------------------------
+// 特例模板，处理不包含Traits的匹配
+// 也是一个递归终止条件，可能Traits匹配了一部分TraitSpecifications
+// 直接继承BaseTraits
 template <>
 struct AnalyzeExecPolicy<void>
     : AnalyzeExecPolicyBaseTraits<execution_policy_trait_specifications> {
@@ -140,6 +152,11 @@ struct AnalyzeExecPolicy<void>
 // General PolicyTraitMatcher version
 
 // Matching case
+// 递归比较Trait和TraitSpe
+// 即每次比较execution_policy_trait_specifications中的一个TraitSepc和Traits中一个Traits
+// PolicyTaitMathcer在内部使用具体的is_<concept>比较，如:is_excecution_space
+// is_execution_space使用宏定义，其中使用detected_t检测某个T是否含有成员类型execution_space
+// 故一个类为执行空间类，只需要包含成员类型execution_space
 template <class TraitSpec, class... TraitSpecs, class Trait, class... Traits>
 struct AnalyzeExecPolicyUseMatcher<
     std::enable_if_t<PolicyTraitMatcher<TraitSpec, Trait>::value>,
@@ -152,6 +169,7 @@ struct AnalyzeExecPolicyUseMatcher<
 };
 
 // Non-matching case
+// enable_if_t保证TraitSpec和Trait相同时，由于!::value导致ill-formed，该模板匹配失败忽略
 template <class TraitSpec, class... TraitSpecs, class Trait, class... Traits>
 struct AnalyzeExecPolicyUseMatcher<
     std::enable_if_t<!PolicyTraitMatcher<TraitSpec, Trait>::value>,
@@ -166,6 +184,7 @@ struct AnalyzeExecPolicyUseMatcher<
 // No match found case:
 template <class>
 struct show_name_of_invalid_execution_policy_trait;
+// err如果Trait无法匹配任意一个TraitSpec
 template <class Trait, class... Traits>
 struct AnalyzeExecPolicyUseMatcher<void, type_list<>, Trait, Traits...> {
   static constexpr auto trigger_error_message =
@@ -178,6 +197,8 @@ struct AnalyzeExecPolicyUseMatcher<void, type_list<>, Trait, Traits...> {
 };
 
 // All traits matched case:
+// 递归终止模板-也继承AnalyzeExecPolicy<void>,所以最终都归结到<void>这个特例模板上
+// type_list<>即表示预先定义的 execution_policy_trait_specifications 已经被检查完
 template <>
 struct AnalyzeExecPolicyUseMatcher<void, type_list<>>
     : AnalyzeExecPolicy<void> {
@@ -214,6 +235,13 @@ constexpr bool warn_if_deprecated(std::true_type) { return true; }
   static_assert(                        \
       warn_if_deprecated(std::integral_constant<bool, __VA_ARGS__>()), "")
 
+// 实际就是继承的AnalyzeExecuPolicy, 这个Defaults是对特殊情况的包装
+// 从总体上来说，就是对给到具体某个Policy的模板类型参数(Traits)进行解析
+// 如RangePolicy<Serail, TagA> rangp;
+// 这里通过递归模板匹配到了ExecutionSpaceTrait和WorkTagTrait
+// 此时通过一系列继承为RangePolicy添加了属性execution_space和work_tag类属性（对应Serial和TagA)
+// 对于没有给出的TraitSpecs同样需要添加对应的属性，如index_type等，此时添加的是默认属性类故index_type_is_defaulted = true
+// 而execution_space_is_defaulted = false；这是通过在具体匹配到某个TraitSpec时通过mixin_matching_trait实现的，而is_defaulted=true则是最后通过一个默认多重继承实现的继承默认值(根类为默认的BaseTraits, mixin在中间继承的)
 template <typename... Traits>
 struct PolicyTraits
     : ExecPolicyTraitsWithDefaults<AnalyzeExecPolicy<void, Traits...>> {
