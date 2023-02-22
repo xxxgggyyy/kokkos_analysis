@@ -95,6 +95,9 @@ ThreadsExec *s_threads_exec[ThreadsExec::MAX_THREAD_COUNT] = {nullptr};
 std::thread::id s_threads_pid[ThreadsExec::MAX_THREAD_COUNT];
 std::pair<unsigned, unsigned> s_threads_coord[ThreadsExec::MAX_THREAD_COUNT];
 
+// 0: total_threads count
+// 1: threads count per numa
+// 2: threads count per core
 int s_thread_pool_size[3] = {0, 0, 0};
 
 unsigned s_current_reduce_size = 0;
@@ -387,6 +390,7 @@ void ThreadsExec::internal_fence(const std::string &name,
 /** \brief  Begin execution of the asynchronous functor */
 void ThreadsExec::start(void (*func)(ThreadsExec &, const void *),
                         const void *arg) {
+  // 验证当前是否为主线程，true表示还需要验证是否执行了初始化，Kokkos::initialize间接初始化了ThreadsExec相关的变量
   verify_is_process("ThreadsExec::start", true);
 
   if (s_current_function || s_current_function_arg) {
@@ -695,8 +699,7 @@ void ThreadsExec::initialize(int thread_count_arg) {
       s_current_function_arg =
           reinterpret_cast<void *>(hwloc_can_bind ? ~0u : ith);
 
-      // Make sure all outstanding memory writes are complete
-      // before spawning the new thread.
+      // Make sure all outstanding memory writes are complete before spawning the new thread.
       memory_fence();
 
       // Spawn thread executing the 'driver()' function.

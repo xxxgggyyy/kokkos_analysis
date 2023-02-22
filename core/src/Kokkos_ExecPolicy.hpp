@@ -95,6 +95,10 @@ struct ChunkSize {
  *
  *  Blocking is the granularity of partitioning the range among threads.
  */
+// RangePolicy的作用就像一个特性集中器，其通过PolicyTraits<Properties...>（内部通过AnalyzePolicy)收集用户指定的Properties
+// 这些属性在被检查正确性后收集到了对应的成员类型中，比如指定在Properties中指定Serial，最后RangePolicy::execution_space=Serial
+// 而未在Properties中指定的，则使用默认类型，如Rangepolicy::index_type=int RangePolicy::sche_type=Static等
+// 故RangePolicy除了有Range并行的语义还有已知道的其他Policy语义
 template <class... Properties>
 class RangePolicy : public Impl::PolicyTraits<Properties...> {
  public:
@@ -263,6 +267,8 @@ class RangePolicy : public Impl::PolicyTraits<Properties...> {
         : m_begin(0), m_end(0) {
       if (part_size) {
         // Split evenly among partitions, then round up to the granularity.
+        // granularity就是一个2的幂的数就是字面意思的粒度
+        // 一下公式将work_part向上圆整为gran的倍数
         const member_type work_part =
             ((((range.end() - range.begin()) + (part_size - 1)) / part_size) +
              range.m_granularity_mask) &

@@ -170,8 +170,14 @@ unsigned thread_mapping(const char* const label, const bool allow_async,
     // Working synchronously and include process core as threads_coord[0].
     // Swap the NUMA coordinate of the process core with 0
     // Swap the CORE coordinate of the process core with 0
+    // 为每个线程分配NUMA坐标
     for (unsigned i = 0, inuma = avail_numa_count - use_numa_count;
          inuma < avail_numa_count; ++inuma) {
+        // 这里假设的proc_coord不一定是0，可以是任意初始化的
+        // 其目的在于，若numa或者cores全部使用时，则将坐标numa=0的和proc_coord交换，通俗一点就是为第0个numa分配时，分配给proc所在的numa, 注意此时是体现不出该交换的含义的
+        // 其目的体现在avail_numa_count>use_unma_count时，此时[0, a-u)的numa是空着的，那么当为proc所在的numa分配线程时，将其分配给0号numa,即在有空余的numa的时候，让proc单独在一个numa上执行。
+        // core_coord同理
+        // 当然这里默认的proc坐标为(0, 0)，此时分配线程时就不会从0开始，也就不涉及交换
       const unsigned numa_coord = 0 == inuma
                                       ? proc_coord.first
                                       : (proc_coord.first == inuma ? 0 : inuma);
@@ -190,6 +196,8 @@ unsigned thread_mapping(const char* const label, const bool allow_async,
     // Working asynchronously and omit the process' NUMA region from the pool.
     // Swap the NUMA coordinate of the process core with ( ( avail_numa_count -
     // use_numa_count ) - 1 )
+    // 同上，只是有多余的numa时，还是让proc单独待在一个位置，其他的交换到numa_coord_swap，也就是使用的第一个unma的前面一个空余的
+    // icore则不用
     const unsigned numa_coord_swap = (avail_numa_count - use_numa_count) - 1;
     for (unsigned i = 0, inuma = avail_numa_count - use_numa_count;
          inuma < avail_numa_count; ++inuma) {
@@ -208,6 +216,7 @@ unsigned thread_mapping(const char* const label, const bool allow_async,
     // Working asynchronously and omit the process' core from the pool.
     // Swap the CORE coordinate of the process core with ( (
     // avail_cores_per_numa - use_cores_per_numa ) - 1 )
+    // 此时无多余的unuma但有多余的core，同样，让proc单独在一个core里，其他的应当输入该core的交换到第一个使用的core之前去
     const unsigned core_coord_swap =
         (avail_cores_per_numa - use_cores_per_numa) - 1;
     for (unsigned i = 0, inuma = avail_numa_count - use_numa_count;
