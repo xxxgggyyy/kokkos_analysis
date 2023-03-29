@@ -194,6 +194,7 @@ ThreadsExec::ThreadsExec()
       m_pool_size(0),
       m_pool_fan_size(0),
       m_pool_state(ThreadsExec::Terminating) {
+  // 通过全局变量来区分是否是子线程构造的
   if (&s_threads_process != this) {
     // A spawned thread
 
@@ -212,6 +213,7 @@ ThreadsExec::ThreadsExec()
       const std::pair<unsigned, unsigned> coord =
           Kokkos::hwloc::get_this_thread_coordinate();
 
+      // 设置各种rank和状态
       m_numa_rank      = coord.first;
       m_numa_core_rank = coord.second;
       m_pool_base      = s_threads_exec;
@@ -219,11 +221,13 @@ ThreadsExec::ThreadsExec()
       m_pool_rank_rev  = s_thread_pool_size[0] - (pool_rank() + 1);
       m_pool_size      = s_thread_pool_size[0];
       m_pool_fan_size  = fan_size(m_pool_rank, m_pool_size);
+      // 注意构造成功后其状态被设置为了Active，即运行态
       m_pool_state     = ThreadsExec::Active;
 
       s_threads_pid[m_pool_rank] = std::this_thread::get_id();
 
       // Inform spawning process that the threads_exec entry has been set.
+      // 而将主线程的状态也设置为了运行态
       s_threads_process.m_pool_state = ThreadsExec::Active;
     } else {
       // Inform spawning process that the threads_exec entry could not be set.
